@@ -305,12 +305,17 @@ function operator(pro) {
           usflag = usflag === "🇹🇼" ? "🇨🇳" : usflag;
         }
       }
-      keyover = keyover
-        .concat(firstName, usflag, nNames, findKeyValue, retainKey, ikey, ikeys)
-        .filter((k) => k !== "");
-      // 去重（防止 2倍率 重复出现）
-      keyover = keyover.filter((v, i, a) => a.indexOf(v) === i);
-      e.name = keyover.join(FGF);
+      const uniq = (arr) => arr.filter((v, i, a) => a.indexOf(v) === i);
+
+      // 1) “基名”只用于分组编号：前缀/国旗/机场名/国家（不含倍率等尾巴）
+      const baseParts = uniq([firstName, usflag, nNames, findKeyValue].filter((k) => k !== ""));
+      const tailParts = uniq([retainKey, ikey, ikeys].filter((k) => k !== ""));
+
+      e.__baseName = baseParts.join(FGF);     // 用于编号分组
+      e.__tailName = tailParts.join(FGF);     // 倍率/家宽/IPLC 等放这里
+
+      // 临时名（后面 jxh 会重排为：基名 + 序号 + 尾巴）
+      e.name = e.__tailName ? `${e.__baseName}${FGF}${e.__tailName}` : e.__baseName;
     } else {
       if (nm) {
         e.name = FNAME + FGF + e.name;
@@ -330,8 +335,25 @@ function operator(pro) {
 // prettier-ignore
 function getList(arg) { switch (arg) { case 'us': return EN; case 'gq': return FG; case 'quan': return QC; default: return ZH; }}
 // prettier-ignore
-function jxh(e) { const n = e.reduce((e, n) => { const t = e.find((e) => e.name === n.name); if (t) { t.count++; t.items.push({ ...n, name: `${n.name}${XHFGF}${t.count.toString().padStart(2, "0")}`, }); } else { e.push({ name: n.name, count: 1, items: [{ ...n, name: `${n.name}${XHFGF}01` }], }); } return e; }, []);const t=(typeof Array.prototype.flatMap==='function'?n.flatMap((e) => e.items):n.reduce((acc, e) => acc.concat(e.items),[])); e.splice(0, e.length, ...t); return e;}
-// prettier-ignore
+function jxh(pro) {
+  const counter = Object.create(null);
+
+  for (const p of pro) {
+    const base = p.__baseName || p.name; // 分组键：只看地区基名
+    counter[base] = (counter[base] || 0) + 1;
+
+    const idx = String(counter[base]).padStart(2, "0");
+    const tail = p.__tailName || "";
+
+    // 关键：输出结构 = 基名 + (sn) + 序号 + (fgf) + 尾巴
+    // - sn=-  => 香港-01-0.3倍率
+    // - sn=   => 香港01-0.3倍率
+    p.name = tail ? `${base}${XHFGF}${idx}${FGF}${tail}` : `${base}${XHFGF}${idx}`;
+  }
+
+  return pro;
+}
+
 function oneP(e) { const t = e.reduce((e, t) => { const n = t.name.replace(/[^A-Za-z0-9\u00C0-\u017F\u4E00-\u9FFF]+\d+$/, ""); if (!e[n]) { e[n] = []; } e[n].push(t); return e; }, {}); for (const e in t) { if (t[e].length === 1 && t[e][0].name.endsWith("01")) {/* const n = t[e][0]; n.name = e;*/ t[e][0].name= t[e][0].name.replace(/[^.]01/, "") } } return e; }
 // prettier-ignore
 function fampx(pro) { const wis = []; const wnout = []; for (const proxy of pro) { const fan = specialRegex.some((regex) => regex.test(proxy.name)); if (fan) { wis.push(proxy); } else { wnout.push(proxy); } } const sps = wis.map((proxy) => specialRegex.findIndex((regex) => regex.test(proxy.name)) ); wis.sort( (a, b) => sps[wis.indexOf(a)] - sps[wis.indexOf(b)] || a.name.localeCompare(b.name) ); wnout.sort((a, b) => pro.indexOf(a) - pro.indexOf(b)); return wnout.concat(wis);}
