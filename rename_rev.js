@@ -95,8 +95,8 @@ const valueArray= [
   "20倍率","30倍率","40倍率","50倍率",
   "IPLC","IEPL","Kern","Edge","Pro","Std","Exp","Biz","Fam","Game","Buy","Zx","LB","CF","UDP","GPT","UDPN"
 ];
-const nameblnx = /(高倍|(?!1)2+(x|倍)|ˣ²|ˣ³|ˣ⁴|ˣ⁵|ˣ¹⁰)/i;
-const namenx = /(高倍|(?!1)(0\.|\d)+(x|倍)|ˣ²|ˣ³|ˣ⁴|ˣ⁵|ˣ¹⁰)/i;
+const nameblnx = /(高倍|(?!1)2+(x|倍|倍率)|ˣ²|ˣ³|ˣ⁴|ˣ⁵|ˣ¹⁰)/i;
+const namenx  = /(高倍|(?!1)(0\.|\d)+(x|倍|倍率)|ˣ²|ˣ³|ˣ⁴|ˣ⁵|ˣ¹⁰)/i;
 const keya =
   /港|Hong|HK|新加坡|SG|Singapore|日本|Japan|JP|美国|United States|US|韩|土耳其|TR|Turkey|Korea|KR|🇸🇬|🇭🇰|🇯🇵|🇺🇸|🇰🇷|🇹🇷/i;
 const keyb =
@@ -284,6 +284,8 @@ function operator(pro) {
       keyover = keyover
         .concat(firstName, usflag, nNames, findKeyValue, retainKey, ikey, ikeys)
         .filter((k) => k !== "");
+      // 去重（防止 2倍率 重复出现）
+      keyover = keyover.filter((v, i, a) => a.indexOf(v) === i);
       e.name = keyover.join(FGF);
     } else {
       if (nm) {
