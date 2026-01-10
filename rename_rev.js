@@ -42,20 +42,44 @@
  * [blockquic] blockquic=on 阻止; blockquic=off 不阻止
  */
 
-// const inArg = {'blkey':'iplc+GPT>GPTnewName+NF+IPLC', 'flag':true };
 const inArg = $arguments; // console.log(inArg)
-const nx = inArg.nx || false,
-  bl = inArg.bl || false,
-  nf = inArg.nf || false,
-  key = inArg.key || false,
-  blgd = inArg.blgd || false,
-  blpx = inArg.blpx || false,
-  blnx = inArg.blnx || false,
-  numone = inArg.one || false,
-  debug = inArg.debug || false,
-  clear = inArg.clear || false,
-  addflag = inArg.flag || false,
-  nm = inArg.nm || false;
+// 兼容 Sub-Store：#bl 可能解析成 ""（空字符串），用 inArg.bl || false 会变成 false
+const hasArg = (k) => Object.prototype.hasOwnProperty.call(inArg, k);
+const argBool = (k, def = false) => {
+  if (!hasArg(k)) return def;
+  const v = inArg[k];
+
+  if (v === true) return true;
+  if (v === false) return false;
+  if (v === undefined || v === null) return true;
+
+  if (typeof v === "number") return v !== 0;
+
+  if (typeof v === "string") {
+    const s = v.trim().toLowerCase();
+    if (s === "") return true;
+    if (["1", "true", "on", "yes", "y"].includes(s)) return true;
+    if (["0", "false", "off", "no", "n"].includes(s)) return false;
+    // 其它未知字符串：按“存在即开启”处理
+    return true;
+  }
+
+  return Boolean(v);
+};
+
+const nx = argBool("nx"),
+  bl = argBool("bl"),
+  nf = argBool("nf"),
+  key = argBool("key"),
+  blgd = argBool("blgd"),
+  blpx = argBool("blpx"),
+  blnx = argBool("blnx"),
+  numone = argBool("one"),
+  debug = argBool("debug"),
+  clear = argBool("clear"),
+  addflag = argBool("flag"),
+  nm = argBool("nm");
+
 
 const FGF = inArg.fgf == undefined ? " " : decodeURI(inArg.fgf),
   XHFGF = inArg.sn == undefined ? " " : decodeURI(inArg.sn),
