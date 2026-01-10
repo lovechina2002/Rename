@@ -1,7 +1,7 @@
 /**
  * 基于https://raw.githubusercontent.com/Keywos/rule/main/rename.js 微调
- * 修改内容1：让家宽 / HOME / res / 🏠等都显示为家宽，Fam重命名为家宽 Biz 重命名为商宽
- *
+ * 调用：https://raw.githubusercontent.com/lovechina2002/Rename/main/rename.js
+ * 输出家宽/BGP等参数、倍率、使用-分隔的调用方法 https://raw.githubusercontent.com/lovechina2002/Rename/main/rename.js#blgd&bl&one&fgf=-&sn=
  * 用法：Sub-Store 脚本操作添加
  * rename.js 以下是此脚本支持的参数，必须以 # 为开头多个参数使用"&"连接，参考上述地址为例使用参数。 禁用缓存url#noCache
  *
