@@ -429,7 +429,3 @@ function fampx(pro) {
   return wnout.concat(wis);
 }
 
-// ============ Sub-Store 执行入口 ============
-// $content 是 Sub-Store 传入的节点数组
-// 必须返回处理后的节点数组
-operator($content);
