@@ -429,4 +429,3 @@ function fampx(pro) {
   return wnout.concat(wis);
 }
 
-module.exports = operator;
