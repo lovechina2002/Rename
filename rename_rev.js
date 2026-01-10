@@ -80,9 +80,11 @@ const nx = argBool("nx"),
   addflag = argBool("flag"),
   nm = argBool("nm");
 
+const XHFGF =
+  inArg.sn === undefined ? " " :
+  (inArg.sn === true ? "" : decodeURI(String(inArg.sn)).trim());
 
 const FGF = inArg.fgf == undefined ? " " : decodeURI(inArg.fgf),
-  XHFGF = inArg.sn == undefined ? " " : decodeURI(inArg.sn),
   FNAME = inArg.name == undefined ? "" : decodeURI(inArg.name),
   BLKEY = inArg.blkey == undefined ? "" : decodeURI(inArg.blkey),
   blockquic = inArg.blockquic == undefined ? "" : decodeURI(inArg.blockquic),
