@@ -1,7 +1,8 @@
 /**
  * 基于：https://raw.githubusercontent.com/Keywos/rule/main/rename.js 修改
- *
+ * https://raw.githubusercontent.com/lovechina2002/Rename/main/rename_rev.js
  * 让其显示倍率、家宽等信息，并用 - 分隔 ，参数#blgd&bl&fgf=-&sn=-
+ * 调用方法： https://raw.githubusercontent.com/lovechina2002/Rename/main/rename_rev.js#blgd&bl&fgf=-&sn=-
  * 用法：Sub-Store 脚本操作添加
  * rename.js 以下是此脚本支持的参数，必须以 # 为开头多个参数使用"&"连接，参考上述地址为例使用参数。 禁用缓存url#noCache
  *
