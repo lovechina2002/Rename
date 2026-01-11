@@ -1,11 +1,50 @@
 /**
- * Sub-Store 脚本操作版（无 $done）
- * - 支持倍率显示（普通倍率 / ˣ上标倍率）
- * - 支持 blgd 特性标签叠加
- * - 在开启 blgd 时，额外保留：剩余流量 / 到期 / Emby（无需 blkey）
+ * 基于：https://raw.githubusercontent.com/Keywos/rule/main/rename.js 修改
+ * https://raw.githubusercontent.com/lovechina2002/Rename/main/rename_rev.js
+ * 让其显示倍率、家宽等信息，并用 - 分隔 ，参数#blgd&bl&fgf=-&sn=-
+ * 调用方法： https://raw.githubusercontent.com/lovechina2002/Rename/main/rename_rev.js#blgd&bl&fgf=-&sn=-
+ * 用法：Sub-Store 脚本操作添加
+ * rename.js 以下是此脚本支持的参数，必须以 # 为开头多个参数使用"&"连接，参考上述地址为例使用参数。 禁用缓存url#noCache
+ *
+ *** 主要参数
+ * [in=] 自动判断机场节点名类型 优先级 zh(中文) -> flag(国旗) -> quan(英文全称) -> en(英文简写)
+ * 如果不准的情况, 可以加参数指定:
+ *
+ * [nm]    保留没有匹配到的节点
+ * [in=zh] 或in=cn识别中文
+ * [in=en] 或in=us 识别英文缩写
+ * [in=flag] 或in=gq 识别国旗 如果加参数 in=flag 则识别国旗 脚本操作前面不要添加国旗操作 否则移除国旗后面脚本识别不到
+ * [in=quan] 识别英文全称
+ *
+ * [out=]   输出节点名可选参数: (cn或zh ，us或en ，gq或flag ，quan) 对应：(中文，英文缩写 ，国旗 ，英文全称) 默认中文 例如 [out=en] 或 out=us 输出英文缩写
+ *
+ *** 分隔符参数
+ * [fgf=]   节点名前缀或国旗分隔符，默认为空格；
+ * [sn=]    设置国家与序号之间的分隔符，默认为空格；
+ *
+ * 序号参数
+ * [one]    清理只有一个节点的地区的01
+ * [flag]   给节点前面加国旗
+ *
+ *** 前缀参数
+ * [name=]  节点添加机场名称前缀；
+ * [nf]     把 name= 的前缀值放在最前面
+ *
+ *** 保留参数
+ * [blkey=iplc+gpt+NF+IPLC] 用+号添加多个关键词 保留节点名的自定义字段 需要区分大小写!
+ * 如果需要修改 保留的关键词 替换成别的 可以用 > 分割 例如 [#blkey=GPT>新名字+其他关键词] 这将把【GPT】替换成【新名字】
+ * 例如      https://raw.githubusercontent.com/Keywos/rule/main/rename.js#flag&blkey=GPT>新名字+NF
+ *
+ * [blgd]   保留: 家宽 IPLC BGP 中转 优化 下载 ˣ² 等（可叠加显示）
+ * [bl]     正则匹配保留 [0.1x, x0.2, 6x ,3倍]等标识；未写倍率时补 1.0倍率
+ * [nx]     保留1倍率与不显示倍率的
+ * [blnx]   只保留高倍率
+ * [clear]  清理乱名
+ * [blpx]   如果用了上面的bl参数,对保留标识后的名称分组排序,如果没用上面的bl参数单独使用blpx则不起任何作用
+ * [blockquic] blockquic=on 阻止; blockquic=off 不阻止
  */
 
-const inArg = $arguments;
+const inArg = $arguments; // console.log(inArg)
 
 // 兼容 Sub-Store：#bl 可能解析成 ""（空字符串），用 inArg.bl || false 会变成 false
 const hasArg = (k) => Object.prototype.hasOwnProperty.call(inArg, k);
@@ -24,6 +63,7 @@ const argBool = (k, def = false) => {
     if (s === "") return true;
     if (["1", "true", "on", "yes", "y"].includes(s)) return true;
     if (["0", "false", "off", "no", "n"].includes(s)) return false;
+    // 其它未知字符串：按“存在即开启”处理
     return true;
   }
 
@@ -77,15 +117,15 @@ const QC = ['Hong Kong','Macao','Taiwan','Japan','Korea','Singapore','United Sta
 
 const specialRegex = [
   /(\d\.)?\d+(×|倍率)/i,
-  /ˣ[⁰¹²³⁴⁵⁶⁷⁸⁹0-9˙.·⁻-]+/i,
-  /IPLC|IEPL|BGP|中转|中轉|优化|優化|下载|下載|Kern|Edge|Pro|Std|Exp|商宽|家宽|RES|HOME|FAM|🏠|Game|Buy|Zx|LB|Emby|剩余|剩餘|到期|過期/i,
+  /ˣ[⁰¹²³⁴⁵⁶⁷⁸⁹0-9˙.·⁻-]+/i, // 任意“ˣ上标/数字”倍率（支持普通点 .）
+  /IPLC|IEPL|BGP|中转|中轉|优化|優化|下载|下載|Kern|Edge|Pro|Std|Exp|商宽|家宽|RES|HOME|FAM|🏠|Game|Buy|Zx|LB/i,
 ];
 
-// clear 开启时会过滤命中这些关键词的“乱名节点”
+// 修改点：移除 到期/剩余/流量，避免 clear 过滤这些内容
 const nameclear =
-  /(套餐|到期|有效|剩余|版本|已用|过期|失联|测试|官方|网址|备用|群|TEST|客服|网站|获取|订阅|流量|机场|下次|官址|联系|邮箱|工单|学术|USE|USED|TOTAL|EXPIRE|EMAIL)/i;
+  /(套餐|有效|版本|已用|过期|失联|测试|官方|网址|备用|群|TEST|客服|网站|获取|订阅|机场|下次|官址|联系|邮箱|工单|学术|USE|USED|TOTAL|EXPIRE|EMAIL)/i;
 
-// 只保留“特性”枚举
+// 只保留“特性”枚举（倍率不再硬编码在这里）
 const regexArray = [
   /IPLC/i,
   /IEPL/i,
@@ -107,6 +147,7 @@ const regexArray = [
   /cloudflare/i,
   /\budp\b/i,
   /\bgpt\b/i,
+  /\bemby\b/i, // 修改点：Emby 作为特性标签自动提取
   /udpn\b/i,
   /\bBT\b/i,
   /\bISP\b/i,
@@ -134,12 +175,14 @@ const valueArray = [
   "CF",
   "UDP",
   "GPT",
+  "Emby", // 修改点：与 regexArray 对齐
   "UDPN",
   "BT",
   "ISP",
   "Premium",
 ];
 
+// 高倍/倍率过滤：支持普通倍率 + 任意 ˣ... 上标倍率（支持普通点 .）
 const nameblnx = /(高倍|(?!1)\d+(?:\.\d+)?(x|倍|倍率)|ˣ[⁰¹²³⁴⁵⁶⁷⁸⁹0-9˙.·⁻-]+)/i;
 const namenx = /(高倍|(?!1)\d+(?:\.\d+)?(x|倍|倍率)|ˣ[⁰¹²³⁴⁵⁶⁷⁸⁹0-9˙.·⁻-]+)/i;
 
@@ -197,17 +240,19 @@ function formatRate(numStr) {
   const n = Number(numStr);
   if (!Number.isFinite(n)) return String(numStr);
 
+  // 整数直接变成 x.0
   if (!String(numStr).includes(".")) return n.toFixed(1);
 
+  // 小数：去掉末尾 0；如果变成整数则补 .0
   let s = String(numStr).replace(/0+$/, "");
-  s = s.replace(/\.$/, "");
+  s = s.replace(/\.$/, ""); // 5. -> 5
   if (!s.includes(".")) s = s + ".0";
   return s;
 }
 
 /**
- * 倍率来源统一函数：普通倍率 > ˣ倍率 > 默认1.0
- * - 支持普通点 '.' 与上标点 '˙'，以及 '·'
+ * 统一倍率来源（优先级：普通倍率 > ˣ上标倍率 > 默认 1.0）
+ * 返回形如： "0.5倍率" / "1.5倍率" / "2.0倍率"
  */
 const SUP_MAP = {
   "⁰": "0",
@@ -220,14 +265,15 @@ const SUP_MAP = {
   "⁷": "7",
   "⁸": "8",
   "⁹": "9",
-  "˙": ".",
-  ".": ".",
-  "·": ".",
+  "˙": ".", // 上标点
+  ".": ".", // 普通点
+  "·": ".", // 中点也按小数点处理（防一手）
   "⁻": "-",
   "-": "-",
 };
 
 function parseNormalRate(name) {
+  // 支持：0.1x / x0.2 / 6x / 3倍 / 5.00倍率 / ×1.5 等
   const m = name.match(
     /(?:倍率|[xX×])\s*([0-9]+(?:\.[0-9]+)?)|([0-9]+(?:\.[0-9]+)?)\s*(?:倍|倍率|[xX×])/
   );
@@ -240,6 +286,7 @@ function parseNormalRate(name) {
 }
 
 function parseXRate(name) {
+  // 允许：ˣ⁰˙⁵ / ˣ¹˙⁵ / ˣ2.5 / ˣ0.5 / ˣ²⁰ ...
   const m = name.match(/ˣ([⁰¹²³⁴⁵⁶⁷⁸⁹0-9˙.·⁻-]+)/);
   if (!m) return "";
   const seq = m[1];
@@ -248,6 +295,7 @@ function parseXRate(name) {
     if (SUP_MAP[ch] === undefined) return "";
     s += SUP_MAP[ch];
   }
+
   if (s.startsWith(".")) s = "0" + s;
   if (s.endsWith(".")) s = s.slice(0, -1);
 
@@ -257,6 +305,7 @@ function parseXRate(name) {
 }
 
 function getRateUnified(name) {
+  // 优先：普通倍率 > ˣ倍率 > 默认 1.0
   const normal = parseNormalRate(name);
   if (normal) return normal;
 
@@ -266,94 +315,17 @@ function getRateUnified(name) {
   return "1.0倍率";
 }
 
-// blgd 开启时额外保留：剩余流量 / 到期 / Emby（无需 blkey）
-function collectExtraKeeps(name) {
-  const out = [];
-
-  // Emby
-  if (/Emby/i.test(name)) out.push("Emby");
-
-  // 剩余流量：优先提取带数值
-  const mRemain = name.match(/(?:剩余|剩餘)\s*[:：]?\s*([0-9.]+\s*(?:TB|GB|MB|G|M))/i);
-  if (mRemain) {
-    out.push(`剩余${String(mRemain[1]).replace(/\s+/g, "")}`);
-  } else if (/(?:剩余流量|剩餘流量|剩余|剩餘)/i.test(name)) {
-    out.push("剩余流量");
-  }
-
-  // 到期：优先提取日期
-  const mExpire = name.match(/到期\s*[:：]?\s*([0-9]{4}[-\/.][0-9]{1,2}[-\/.][0-9]{1,2})/);
-  if (mExpire) {
-    out.push(`到期${mExpire[1]}`);
-  } else if (/(?:到期|過期|过期|EXPIRE)/i.test(name)) {
-    out.push("到期");
-  }
-
-  return out;
-}
-
-// prettier-ignore
-function getList(arg) { switch (arg) { case 'us': return EN; case 'gq': return FG; case 'quan': return QC; default: return ZH; }}
-
-// prettier-ignore
-function jxh(pro) {
-  const counter = Object.create(null);
-
-  for (const p of pro) {
-    const base = p.__baseName || p.name;
-    counter[base] = (counter[base] || 0) + 1;
-
-    const idx = String(counter[base]).padStart(2, "0");
-    const tail = p.__tailName || "";
-
-    p.name = tail ? `${base}${XHFGF}${idx}${FGF}${tail}` : `${base}${XHFGF}${idx}`;
-  }
-
-  return pro;
-}
-
-function oneP(e) {
-  const t = e.reduce((e, t) => {
-    const n = t.name.replace(/[^A-Za-z0-9\u00C0-\u017F\u4E00-\u9FFF]+\d+$/, "");
-    if (!e[n]) e[n] = [];
-    e[n].push(t);
-    return e;
-  }, {});
-  for (const e in t) {
-    if (t[e].length === 1 && t[e][0].name.endsWith("01")) {
-      t[e][0].name = t[e][0].name.replace(/[^.]01/, "");
-    }
-  }
-  return e;
-}
-
-// prettier-ignore
-function fampx(pro) {
-  const wis = [];
-  const wnout = [];
-  for (const proxy of pro) {
-    const fan = specialRegex.some((regex) => regex.test(proxy.name));
-    if (fan) wis.push(proxy);
-    else wnout.push(proxy);
-  }
-  const sps = wis.map((proxy) => specialRegex.findIndex((regex) => regex.test(proxy.name)));
-  wis.sort((a, b) => sps[wis.indexOf(a)] - sps[wis.indexOf(b)] || a.name.localeCompare(b.name));
-  wnout.sort((a, b) => pro.indexOf(a) - pro.indexOf(b));
-  return wnout.concat(wis);
-}
-
-const keya2 =
-  /港|Hong|HK|新加坡|SG|Singapore|日本|Japan|JP|美国|United States|US|韩|土耳其|TR|Turkey|Korea|KR|🇸🇬|🇭🇰|🇯🇵|🇺🇸|🇰🇷|🇹🇷/i;
-
-// Sub-Store 脚本操作入口：必须是 operator(proxies) 并返回数组
 function operator(pro) {
   const Allmap = {};
   const outList = getList(outputName);
   let inputList,
     retainKey = "";
 
-  if (inname !== "") inputList = [getList(inname)];
-  else inputList = [ZH, FG, QC, EN];
+  if (inname !== "") {
+    inputList = [getList(inname)];
+  } else {
+    inputList = [ZH, FG, QC, EN];
+  }
 
   inputList.forEach((arr) => {
     arr.forEach((value, valueIndex) => {
@@ -368,7 +340,7 @@ function operator(pro) {
         !(clear && nameclear.test(resname)) &&
         !(nx && namenx.test(resname)) &&
         !(blnx && !nameblnx.test(resname)) &&
-        !(key && !(keya2.test(resname) && /2|4|6|7/i.test(resname)));
+        !(key && !(keya.test(resname) && /2|4|6|7/i.test(resname)));
       return shouldKeep;
     });
   }
@@ -379,6 +351,7 @@ function operator(pro) {
     let bktf = false,
       ens = e.name;
 
+    // 预处理 防止预判或遗漏
     Object.keys(rurekey).forEach((ikey) => {
       if (rurekey[ikey].test(e.name)) {
         e.name = e.name.replace(rurekey[ikey], ikey);
@@ -397,7 +370,9 @@ function operator(pro) {
                 re = true;
               }
             } else {
-              if (ens.includes(i)) e.name += " " + i;
+              if (ens.includes(i)) {
+                e.name += " " + i;
+              }
             }
             retainKey = re ? BLKEY_REPLACE : BLKEYS.filter((items) => e.name.includes(items));
           });
@@ -405,10 +380,15 @@ function operator(pro) {
       }
     });
 
-    if (blockquic == "on") e["block-quic"] = "on";
-    else if (blockquic == "off") e["block-quic"] = "off";
-    else delete e["block-quic"];
+    if (blockquic == "on") {
+      e["block-quic"] = "on";
+    } else if (blockquic == "off") {
+      e["block-quic"] = "off";
+    } else {
+      delete e["block-quic"];
+    }
 
+    // 自定义
     if (!bktf && BLKEY) {
       let BLKEY_REPLACE = "",
         re = false;
@@ -423,64 +403,132 @@ function operator(pro) {
       retainKey = re ? BLKEY_REPLACE : BLKEYS.filter((items) => e.name.includes(items));
     }
 
-    const tags = [];
-    let ikey = "";
+    const tags = []; // 累加特性：IPLC/家宽/BGP/中转/优化/下载...
+    let ikey = ""; // 最终倍率字段（例如 1.0倍率 / 2.0倍率 / 0.5倍率）
 
-    // 开启 bl 或 blgd 任意一个，就输出倍率
+    // 需要显示倍率的开关：开启 bl 或 blgd 任意一个，就输出倍率（倍率来源由统一函数决定）
     const needRate = bl || blgd;
 
-    // blgd：累加特性 + 额外保留（剩余/到期/Emby）
+    // 1) blgd：累加特性（可多项叠加）
     if (blgd) {
       regexArray.forEach((regex, index) => {
-        if (regex.test(e.name)) tags.push(valueArray[index]);
+        if (!regex.test(e.name)) return;
+        tags.push(valueArray[index]);
       });
-      tags.push(...collectExtraKeeps(e.name));
     }
 
-    if (needRate) ikey = getRateUnified(e.name);
+    // 2) 倍率：统一入口（优先普通倍率 > ˣ倍率 > 默认1.0）
+    if (needRate) {
+      ikey = getRateUnified(e.name);
+    }
 
-    // 地区映射
-    if (!GetK) ObjKA(Allmap);
+    !GetK && ObjKA(Allmap);
 
-    const findKey = AMK.find(([k]) => e.name.includes(k));
+    // 匹配地区
+    const findKey = AMK.find(([key]) => e.name.includes(key));
 
     let firstName = "",
       nNames = "";
 
-    if (nf) firstName = FNAME;
-    else nNames = FNAME;
+    if (nf) {
+      firstName = FNAME;
+    } else {
+      nNames = FNAME;
+    }
 
     if (findKey?.[1]) {
       const findKeyValue = findKey[1];
 
       let usflag = "";
       if (addflag) {
-        const idx = outList.indexOf(findKeyValue);
-        if (idx !== -1) {
-          usflag = FG[idx];
+        const index = outList.indexOf(findKeyValue);
+        if (index !== -1) {
+          usflag = FG[index];
           usflag = usflag === "🇹🇼" ? "🇨🇳" : usflag;
         }
       }
 
       const uniq = (arr) => arr.filter((v, i, a) => a.indexOf(v) === i);
 
+      // “基名”只用于分组编号：前缀/国旗/机场名/国家（不含倍率等尾巴）
       const baseParts = uniq([firstName, usflag, nNames, findKeyValue].filter((k) => k !== ""));
+      // “尾巴”用于显示：自定义保留字段 + 特性（可多项） + 倍率
       const tailParts = uniq([retainKey, ...tags, ikey].filter((k) => k !== "" && k.length !== 0));
 
       e.__baseName = baseParts.join(FGF);
       e.__tailName = tailParts.join(FGF);
 
+      // 临时名（后面 jxh 会重排为：基名 + 序号 + 尾巴）
       e.name = e.__tailName ? `${e.__baseName}${FGF}${e.__tailName}` : e.__baseName;
     } else {
-      if (nm) e.name = FNAME + FGF + e.name;
-      else e.name = null;
+      if (nm) {
+        e.name = FNAME + FGF + e.name;
+      } else {
+        e.name = null;
+      }
     }
   });
 
   pro = pro.filter((e) => e.name !== null);
   jxh(pro);
-  if (numone) oneP(pro);
-  if (blpx) pro = fampx(pro);
-  if (key) pro = pro.filter((e) => !keyb.test(e.name));
+  numone && oneP(pro);
+  blpx && (pro = fampx(pro));
+  key && (pro = pro.filter((e) => !keyb.test(e.name)));
   return pro;
+}
+
+// prettier-ignore
+function getList(arg) { switch (arg) { case 'us': return EN; case 'gq': return FG; case 'quan': return QC; default: return ZH; }}
+
+// prettier-ignore
+function jxh(pro) {
+  const counter = Object.create(null);
+
+  for (const p of pro) {
+    const base = p.__baseName || p.name; // 分组键：只看地区基名
+    counter[base] = (counter[base] || 0) + 1;
+
+    const idx = String(counter[base]).padStart(2, "0");
+    const tail = p.__tailName || "";
+
+    // 输出结构 = 基名 + (sn) + 序号 + (fgf) + 尾巴
+    p.name = tail ? `${base}${XHFGF}${idx}${FGF}${tail}` : `${base}${XHFGF}${idx}`;
+  }
+
+  return pro;
+}
+
+function oneP(e) {
+  const t = e.reduce((e, t) => {
+    const n = t.name.replace(/[^A-Za-z0-9\u00C0-\u017F\u4E00-\u9FFF]+\d+$/, "");
+    if (!e[n]) {
+      e[n] = [];
+    }
+    e[n].push(t);
+    return e;
+  }, {});
+  for (const e in t) {
+    if (t[e].length === 1 && t[e][0].name.endsWith("01")) {
+      t[e][0].name = t[e][0].name.replace(/[^.]01/, "");
+    }
+  }
+  return e;
+}
+
+// prettier-ignore
+function fampx(pro) {
+  const wis = [];
+  const wnout = [];
+  for (const proxy of pro) {
+    const fan = specialRegex.some((regex) => regex.test(proxy.name));
+    if (fan) {
+      wis.push(proxy);
+    } else {
+      wnout.push(proxy);
+    }
+  }
+  const sps = wis.map((proxy) => specialRegex.findIndex((regex) => regex.test(proxy.name)));
+  wis.sort((a, b) => sps[wis.indexOf(a)] - sps[wis.indexOf(b)] || a.name.localeCompare(b.name));
+  wnout.sort((a, b) => pro.indexOf(a) - pro.indexOf(b));
+  return wnout.concat(wis);
 }
