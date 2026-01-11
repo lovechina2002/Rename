@@ -5,43 +5,6 @@
  * 调用方法： https://raw.githubusercontent.com/lovechina2002/Rename/main/rename_rev.js#blgd&bl&fgf=-&sn=-
  * 用法：Sub-Store 脚本操作添加
  * rename.js 以下是此脚本支持的参数，必须以 # 为开头多个参数使用"&"连接，参考上述地址为例使用参数。 禁用缓存url#noCache
- *
- *** 主要参数
- * [in=] 自动判断机场节点名类型 优先级 zh(中文) -> flag(国旗) -> quan(英文全称) -> en(英文简写)
- * 如果不准的情况, 可以加参数指定:
- *
- * [nm]    保留没有匹配到的节点
- * [in=zh] 或in=cn识别中文
- * [in=en] 或in=us 识别英文缩写
- * [in=flag] 或in=gq 识别国旗 如果加参数 in=flag 则识别国旗 脚本操作前面不要添加国旗操作 否则移除国旗后面脚本识别不到
- * [in=quan] 识别英文全称
- *
- * [out=]   输出节点名可选参数: (cn或zh ，us或en ，gq或flag ，quan) 对应：(中文，英文缩写 ，国旗 ，英文全称) 默认中文 例如 [out=en] 或 out=us 输出英文缩写
- *
- *** 分隔符参数
- * [fgf=]   节点名前缀或国旗分隔符，默认为空格；
- * [sn=]    设置国家与序号之间的分隔符，默认为空格；
- *
- * 序号参数
- * [one]    清理只有一个节点的地区的01
- * [flag]   给节点前面加国旗
- *
- *** 前缀参数
- * [name=]  节点添加机场名称前缀；
- * [nf]     把 name= 的前缀值放在最前面
- *
- *** 保留参数
- * [blkey=iplc+gpt+NF+IPLC] 用+号添加多个关键词 保留节点名的自定义字段 需要区分大小写!
- * 如果需要修改 保留的关键词 替换成别的 可以用 > 分割 例如 [#blkey=GPT>新名字+其他关键词] 这将把【GPT】替换成【新名字】
- * 例如      https://raw.githubusercontent.com/Keywos/rule/main/rename.js#flag&blkey=GPT>新名字+NF
- *
- * [blgd]   保留: 家宽 IPLC BGP 中转 优化 下载 ˣ² 等（可叠加显示）
- * [bl]     正则匹配保留 [0.1x, x0.2, 6x ,3倍]等标识；未写倍率时补 1.0倍率
- * [nx]     保留1倍率与不显示倍率的
- * [blnx]   只保留高倍率
- * [clear]  清理乱名
- * [blpx]   如果用了上面的bl参数,对保留标识后的名称分组排序,如果没用上面的bl参数单独使用blpx则不起任何作用
- * [blockquic] blockquic=on 阻止; blockquic=off 不阻止
  */
 
 const inArg = $arguments; // console.log(inArg)
@@ -117,17 +80,18 @@ const QC = ['Hong Kong','Macao','Taiwan','Japan','Korea','Singapore','United Sta
 
 const specialRegex = [
   /(\d\.)?\d+(×|倍率)/i,
-  /ˣ[⁰¹²³⁴⁵⁶⁷⁸⁹0-9˙.·⁻-]+/i, // 任意“ˣ上标/数字”倍率（支持普通点 .）
+  /ˣ[⁰¹²³⁴⁵⁶⁷⁸⁹0-9˙.·⁻-]+/i,
   /IPLC|IEPL|BGP|中转|中轉|优化|優化|下载|下載|Kern|Edge|Pro|Std|Exp|商宽|家宽|RES|HOME|FAM|🏠|Game|Buy|Zx|LB/i,
 ];
 
-// 仍保留清理正则，但下面会对白名单（剩余/流量/到期等信息行）做“不过滤”处理
 const nameclear =
   /(套餐|到期|有效|剩余|版本|已用|过期|失联|测试|官方|网址|备用|群|TEST|客服|网站|获取|订阅|流量|机场|下次|官址|联系|邮箱|工单|学术|USE|USED|TOTAL|EXPIRE|EMAIL)/i;
 
 // 信息行白名单：不允许被 clear 过滤，且不走 jxh 编号重命名
-const INFO_LINE_RE =
-  /(剩余\s*流量|套餐\s*到期|到期|流量|剩余|USE|USED|TOTAL|EXPIRE)/i;
+const INFO_LINE_RE = /(剩余\s*流量|套餐\s*到期|到期|流量|剩余|USE|USED|TOTAL|EXPIRE)/i;
+
+// Emby 节点白名单：不允许被 nx/blnx/key/clear 过滤，也不要求地区匹配
+const EMBY_RE = /\bemby\b/i;
 
 // 只保留“特性”枚举（倍率不再硬编码在这里）
 const regexArray = [
@@ -151,7 +115,7 @@ const regexArray = [
   /cloudflare/i,
   /\budp\b/i,
   /\bgpt\b/i,
-  /\bemby\b/i, // Emby 作为特性标签自动提取
+  /\bemby\b/i,
   /udpn\b/i,
   /\bBT\b/i,
   /\bISP\b/i,
@@ -186,7 +150,6 @@ const valueArray = [
   "Premium",
 ];
 
-// 高倍/倍率过滤：支持普通倍率 + 任意 ˣ... 上标倍率（支持普通点 .）
 const nameblnx = /(高倍|(?!1)\d+(?:\.\d+)?(x|倍|倍率)|ˣ[⁰¹²³⁴⁵⁶⁷⁸⁹0-9˙.·⁻-]+)/i;
 const namenx = /(高倍|(?!1)\d+(?:\.\d+)?(x|倍|倍率)|ˣ[⁰¹²³⁴⁵⁶⁷⁸⁹0-9˙.·⁻-]+)/i;
 
@@ -244,20 +207,14 @@ function formatRate(numStr) {
   const n = Number(numStr);
   if (!Number.isFinite(n)) return String(numStr);
 
-  // 整数直接变成 x.0
   if (!String(numStr).includes(".")) return n.toFixed(1);
 
-  // 小数：去掉末尾 0；如果变成整数则补 .0
   let s = String(numStr).replace(/0+$/, "");
-  s = s.replace(/\.$/, ""); // 5. -> 5
+  s = s.replace(/\.$/, "");
   if (!s.includes(".")) s = s + ".0";
   return s;
 }
 
-/**
- * 统一倍率来源（优先级：普通倍率 > ˣ上标倍率 > 默认 1.0）
- * 返回形如： "0.5倍率" / "1.5倍率" / "2.0倍率"
- */
 const SUP_MAP = {
   "⁰": "0",
   "¹": "1",
@@ -269,15 +226,14 @@ const SUP_MAP = {
   "⁷": "7",
   "⁸": "8",
   "⁹": "9",
-  "˙": ".", // 上标点
-  ".": ".", // 普通点
-  "·": ".", // 中点也按小数点处理（防一手）
+  "˙": ".",
+  ".": ".",
+  "·": ".",
   "⁻": "-",
   "-": "-",
 };
 
 function parseNormalRate(name) {
-  // 支持：0.1x / x0.2 / 6x / 3倍 / 5.00倍率 / ×1.5 等
   const m = name.match(
     /(?:倍率|[xX×])\s*([0-9]+(?:\.[0-9]+)?)|([0-9]+(?:\.[0-9]+)?)\s*(?:倍|倍率|[xX×])/
   );
@@ -290,7 +246,6 @@ function parseNormalRate(name) {
 }
 
 function parseXRate(name) {
-  // 允许：ˣ⁰˙⁵ / ˣ¹˙⁵ / ˣ2.5 / ˣ0.5 / ˣ²⁰ ...
   const m = name.match(/ˣ([⁰¹²³⁴⁵⁶⁷⁸⁹0-9˙.·⁻-]+)/);
   if (!m) return "";
   const seq = m[1];
@@ -309,7 +264,6 @@ function parseXRate(name) {
 }
 
 function getRateUnified(name) {
-  // 优先：普通倍率 > ˣ倍率 > 默认 1.0
   const normal = parseNormalRate(name);
   if (normal) return normal;
 
@@ -320,10 +274,10 @@ function getRateUnified(name) {
 }
 
 /**
- * Emby 信息行专用倍率逻辑：
- * - 优先抓取 “x 0.2 / ×0.2 / x0.2” 这种写法
- * - 若倍率数值在 (0,1) 内，则按“折扣”显示：0.2 -> 2.0（乘 10）以满足 Emby01-2.0倍率 的期望
- * - 否则按常规统一倍率
+ * Emby 专用倍率逻辑：
+ * - 优先抓取 “x 0.2 / ×0.2 / x0.2” 等
+ * - 若倍率数值在 (0,1) 内，则按你的期望：0.2 -> 2.0（乘 10）显示
+ * - 否则按常规
  */
 function getEmbyRateSpecial(seg) {
   const mx = seg.match(/[xX×]\s*([0-9]+(?:\.[0-9]+)?)/);
@@ -333,7 +287,7 @@ function getEmbyRateSpecial(seg) {
     if (Number.isFinite(v) && v > 0) return `${v.toFixed(1)}倍率`;
   }
 
-  const r = getRateUnified(seg); // 如 0.2倍率 / 2.0倍率
+  const r = getRateUnified(seg);
   const mn = r.match(/([0-9]+(?:\.[0-9]+)?)/);
   const v = mn ? Number(mn[1]) : NaN;
   if (Number.isFinite(v) && v > 0 && v < 1) return `${(v * 10).toFixed(1)}倍率`;
@@ -341,20 +295,32 @@ function getEmbyRateSpecial(seg) {
 }
 
 /**
- * 将信息行里的 “Emby 01 x 0.2” 这一段替换成 “Emby01-2.0倍率”（分隔符用 FGF）
- * 其余如 “剩余流量：... / 套餐到期：...” 完全原样保留
+ * 将任意包含 Emby 的字符串，重命名为 Emby01-2.0倍率（分隔符用 FGF）
+ * - 优先提取 Emby 后面的数字（Emby 01 / Emby01 / 🎬 Emby 01 等）
+ * - 若没找到序号，则默认 01
+ */
+function makeEmbyNodeName(original) {
+  const m = original.match(/\bEmby\b[^0-9]*0*([0-9]{1,3})/i);
+  const idx = String(m ? Number(m[1]) : 1).padStart(2, "0");
+  const rate = getEmbyRateSpecial(original);
+  return `Emby${idx}${FGF}${rate}`;
+}
+
+/**
+ * 信息行专用：保持整行不变，只替换其中 Emby 段
+ * 例如：
+ *  剩余流量：... 🎬 Emby 01 x 0.2 套餐到期：2026-03-23
+ *  -> 剩余流量：... 🎬 Emby01-2.0倍率 套餐到期：2026-03-23
  */
 function rewriteEmbyInInfoLine(line) {
+  // 捕获类似 “Emby 01 ...倍率/ x0.2 ...” 的片段
   const re =
-    /\bEmby\b\s*0*([0-9]{1,3})\s*(?:(?:[xX×]\s*[0-9]+(?:\.[0-9]+)?)|(?:[0-9]+(?:\.[0-9]+)?\s*(?:倍|倍率))|(?:(?:倍|倍率)\s*[0-9]+(?:\.[0-9]+)?))?/i;
+    /\bEmby\b\s*0*[0-9]{1,3}(?:\s*(?:[xX×]\s*[0-9]+(?:\.[0-9]+)?)|\s*[0-9]+(?:\.[0-9]+)?\s*(?:倍|倍率)|\s*(?:倍|倍率)\s*[0-9]+(?:\.[0-9]+)?)?/i;
 
   const m = line.match(re);
   if (!m) return line;
 
-  const idx = String(Number(m[1])).padStart(2, "0");
-  const rate = getEmbyRateSpecial(m[0]); // 用匹配到的片段来取倍率
-  const newToken = `Emby${idx}${FGF}${rate}`;
-
+  const newToken = makeEmbyNodeName(m[0]);
   return line.replace(m[0], newToken);
 }
 
@@ -376,17 +342,20 @@ function operator(pro) {
     });
   });
 
-  // 过滤阶段：对“信息行白名单”一律不过滤（避免 clear 把“套餐到期/剩余流量”干掉）
+  // 过滤阶段：信息行 + Emby 节点 一律不走过滤（避免被 clear/nx/blnx/key 误杀）
   if (clear || nx || blnx || key) {
     pro = pro.filter((res) => {
       const resname = res.name;
       const isInfoLine = INFO_LINE_RE.test(resname);
+      const isEmby = EMBY_RE.test(resname);
+      const isSpecialKeep = isInfoLine || isEmby;
 
       const shouldKeep =
-        !(clear && nameclear.test(resname) && !isInfoLine) &&
-        !(nx && namenx.test(resname)) &&
-        !(blnx && !nameblnx.test(resname)) &&
-        !(key && !(keya.test(resname) && /2|4|6|7/i.test(resname)));
+        !(clear && nameclear.test(resname) && !isSpecialKeep) &&
+        !(nx && namenx.test(resname) && !isSpecialKeep) &&
+        !(blnx && !nameblnx.test(resname) && !isSpecialKeep) &&
+        !(key && !(keya.test(resname) && /2|4|6|7/i.test(resname)) && !isSpecialKeep);
+
       return shouldKeep;
     });
   }
@@ -397,16 +366,22 @@ function operator(pro) {
     let bktf = false,
       ens = e.name;
 
-    // 信息行：不走地区识别/编号重命名，只做 Emby 片段替换，其余原样保留
+    // 1) 信息行：整行原样，只替换 Emby 段，且不参与 jxh
     if (INFO_LINE_RE.test(e.name)) {
-      if (/\bemby\b/i.test(e.name)) {
-        e.name = rewriteEmbyInInfoLine(e.name);
-      }
-      e.__skipJxh = true; // 关键：避免 jxh 给它重新编号改名
+      if (EMBY_RE.test(e.name)) e.name = rewriteEmbyInInfoLine(e.name);
+      e.__skipJxh = true;
       return;
     }
 
-    // 预处理 防止预判或遗漏
+    // 2) Emby 普通节点：不要求地区匹配，直接改名为 Emby01-2.0倍率，且不参与 jxh
+    if (EMBY_RE.test(e.name)) {
+      e.name = makeEmbyNodeName(e.name);
+      e.__skipJxh = true;
+      return;
+    }
+
+    // ====== 以下为原脚本逻辑（地区识别/特性/倍率）======
+
     Object.keys(rurekey).forEach((ikey) => {
       if (rurekey[ikey].test(e.name)) {
         e.name = e.name.replace(rurekey[ikey], ikey);
@@ -443,7 +418,6 @@ function operator(pro) {
       delete e["block-quic"];
     }
 
-    // 自定义
     if (!bktf && BLKEY) {
       let BLKEY_REPLACE = "",
         re = false;
@@ -458,13 +432,11 @@ function operator(pro) {
       retainKey = re ? BLKEY_REPLACE : BLKEYS.filter((items) => e.name.includes(items));
     }
 
-    const tags = []; // 累加特性：IPLC/家宽/BGP/中转/优化/下载...
-    let ikey = ""; // 最终倍率字段（例如 1.0倍率 / 2.0倍率 / 0.5倍率）
+    const tags = [];
+    let ikey = "";
 
-    // 需要显示倍率的开关：开启 bl 或 blgd 任意一个，就输出倍率（倍率来源由统一函数决定）
     const needRate = bl || blgd;
 
-    // 1) blgd：累加特性（可多项叠加）
     if (blgd) {
       regexArray.forEach((regex, index) => {
         if (!regex.test(e.name)) return;
@@ -472,14 +444,12 @@ function operator(pro) {
       });
     }
 
-    // 2) 倍率：统一入口（优先普通倍率 > ˣ倍率 > 默认1.0）
     if (needRate) {
       ikey = getRateUnified(e.name);
     }
 
     !GetK && ObjKA(Allmap);
 
-    // 匹配地区
     const findKey = AMK.find(([key]) => e.name.includes(key));
 
     let firstName = "",
@@ -505,18 +475,14 @@ function operator(pro) {
 
       const uniq = (arr) => arr.filter((v, i, a) => a.indexOf(v) === i);
 
-      // “基名”只用于分组编号：前缀/国旗/机场名/国家（不含倍率等尾巴）
       const baseParts = uniq([firstName, usflag, nNames, findKeyValue].filter((k) => k !== ""));
-      // “尾巴”用于显示：自定义保留字段 + 特性（可多项） + 倍率
       const tailParts = uniq([retainKey, ...tags, ikey].filter((k) => k !== "" && k.length !== 0));
 
       e.__baseName = baseParts.join(FGF);
       e.__tailName = tailParts.join(FGF);
 
-      // 临时名（后面 jxh 会重排为：基名 + 序号 + 尾巴）
       e.name = e.__tailName ? `${e.__baseName}${FGF}${e.__tailName}` : e.__baseName;
     } else {
-      // 没匹配到地区：按 nm 决定是否保留
       if (nm) {
         e.name = FNAME + FGF + e.name;
       } else {
@@ -541,16 +507,14 @@ function jxh(pro) {
   const counter = Object.create(null);
 
   for (const p of pro) {
-    // 信息行：不参与编号改名（原样保留）
     if (p.__skipJxh) continue;
 
-    const base = p.__baseName || p.name; // 分组键：只看地区基名
+    const base = p.__baseName || p.name;
     counter[base] = (counter[base] || 0) + 1;
 
     const idx = String(counter[base]).padStart(2, "0");
     const tail = p.__tailName || "";
 
-    // 输出结构 = 基名 + (sn) + 序号 + (fgf) + 尾巴
     p.name = tail ? `${base}${XHFGF}${idx}${FGF}${tail}` : `${base}${XHFGF}${idx}`;
   }
 
