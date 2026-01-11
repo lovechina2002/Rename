@@ -4,7 +4,7 @@
  * - https://raw.githubusercontent.com/Keywos/rule/main/rename.js
  * 修改后链接：
  *- https://raw.githubusercontent.com/lovechina2002/Rename/main/rename_rev.js
- *
+ * 个人Substore调用方法：https://raw.githubusercontent.com/lovechina2002/Rename/main/rename_rev.js#bl=&blgd=&fgf=-&sn=#noCache
  * 目标能力
  * 1) 常规节点：识别地区 -> 输出 “地区 + 序号 + 标签(可多项) + 倍率”，字段之间用 fgf 分隔
  * 2) 倍率识别：支持 x/×/倍率/倍、支持上标倍率 ˣ²/ˣ¹⁰ 等；未写倍率时可补 1.0倍率
