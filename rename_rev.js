@@ -33,15 +33,19 @@
  *** 保留参数
  * [blkey=iplc+gpt+NF+IPLC] 用+号添加多个关键词 保留节点名的自定义字段 需要区分大小写!
  * 如果需要修改 保留的关键词 替换成别的 可以用 > 分割 例如 [#blkey=GPT>新名字+其他关键词] 这将把【GPT】替换成【新名字】
- * 例如      https://raw.githubusercontent.com/Keywos/rule/main/rename.js#flag&blkey=GPT>新名字+NF
  *
- * [blgd]   保留: 家宽 IPLC BGP 中转 优化 下载 ˣ² 等（可叠加显示）
+ * [blgd]   保留: 家宽 IPLC BGP 中转 优化 下载 等（可叠加显示）
  * [bl]     正则匹配保留 [0.1x, x0.2, 6x ,3倍]等标识；未写倍率时补 1.0倍率
  * [nx]     保留1倍率与不显示倍率的
  * [blnx]   只保留高倍率
  * [clear]  清理乱名
  * [blpx]   如果用了上面的bl参数,对保留标识后的名称分组排序,如果没用上面的bl参数单独使用blpx则不起任何作用
  * [blockquic] blockquic=on 阻止; blockquic=off 不阻止
+ *
+ * 本版本增强：
+ * - 支持 ˣ⁰˙⁵ / ˣ1.5 等上标倍率与普通点倍率
+ * - 倍率来源统一函数：普通倍率 > ˣ倍率 > 默认1.0
+ * - 在开启 blgd 时，额外保留：剩余流量 / 到期 / Emby（无需传 blkey）
  */
 
 const inArg = $arguments; // console.log(inArg)
@@ -118,7 +122,7 @@ const QC = ['Hong Kong','Macao','Taiwan','Japan','Korea','Singapore','United Sta
 const specialRegex = [
   /(\d\.)?\d+(×|倍率)/i,
   /ˣ[⁰¹²³⁴⁵⁶⁷⁸⁹0-9˙.·⁻-]+/i, // 任意“ˣ上标/数字”倍率（支持普通点 .）
-  /IPLC|IEPL|BGP|中转|中轉|优化|優化|下载|下載|Kern|Edge|Pro|Std|Exp|商宽|家宽|RES|HOME|FAM|🏠|Game|Buy|Zx|LB/i,
+  /IPLC|IEPL|BGP|中转|中轉|优化|優化|下载|下載|Kern|Edge|Pro|Std|Exp|商宽|家宽|RES|HOME|FAM|🏠|Game|Buy|Zx|LB|Emby|剩余|剩餘|到期|過期/i,
 ];
 
 const nameclear =
@@ -195,7 +199,7 @@ const rurekey = {
   "Korea Chuncheon": /Chuncheon|Seoul/g,
   "Hong Kong": /Hongkong|HONG KONG/gi,
   "United Kingdom London": /London|Great Britain/g,
-  "Dubai United Arab Emirates": /United Arab Emirates/g,
+  "Dubai United arab Emirates": /United Arab Emirates/g,
   "Taiwan TW 台湾 🇹🇼": /(台|Tai\s?wan|TW).*?🇨🇳|🇨🇳.*?(台|Tai\s?wan|TW)/g,
   "United States": /USA|Los Angeles|San Jose|Silicon Valley|Michigan/g,
   澳大利亚: /澳洲|墨尔本|悉尼|土澳|(深|沪|呼|京|广|杭)澳/g,
@@ -248,8 +252,7 @@ function formatRate(numStr) {
 }
 
 /**
- * 统一倍率来源（优先级：普通倍率 > ˣ上标倍率 > 默认 1.0）
- * 返回形如： "0.5倍率" / "1.5倍率" / "2.0倍率"
+ * 统一倍率来源（优先级：普通倍率 > ˣ倍率 > 默认 1.0）
  */
 const SUP_MAP = {
   "⁰": "0",
@@ -264,7 +267,7 @@ const SUP_MAP = {
   "⁹": "9",
   "˙": ".", // 上标点
   ".": ".", // 普通点
-  "·": ".", // 中点也按小数点处理（防一手）
+  "·": ".", // 中点
   "⁻": "-",
   "-": "-",
 };
@@ -292,7 +295,6 @@ function parseXRate(name) {
     if (SUP_MAP[ch] === undefined) return "";
     s += SUP_MAP[ch];
   }
-
   if (s.startsWith(".")) s = "0" + s;
   if (s.endsWith(".")) s = s.slice(0, -1);
 
@@ -302,7 +304,6 @@ function parseXRate(name) {
 }
 
 function getRateUnified(name) {
-  // 优先：普通倍率 > ˣ倍率 > 默认 1.0
   const normal = parseNormalRate(name);
   if (normal) return normal;
 
@@ -310,6 +311,32 @@ function getRateUnified(name) {
   if (xrate) return xrate;
 
   return "1.0倍率";
+}
+
+// 额外保留：剩余流量 / 到期 / Emby（随 blgd 开启生效）
+function collectExtraKeeps(name) {
+  const out = [];
+
+  // Emby
+  if (/\bEmby\b/i.test(name) || /Emby/i.test(name)) out.push("Emby");
+
+  // 剩余流量：优先提取带数值
+  const mRemain = name.match(/(?:剩余|剩餘)\s*[:：]?\s*([0-9.]+\s*(?:TB|GB|MB|G|M))/i);
+  if (mRemain) {
+    out.push(`剩余${String(mRemain[1]).replace(/\s+/g, "")}`);
+  } else if (/(?:剩余流量|剩餘流量|剩余|剩餘)/i.test(name)) {
+    out.push("剩余流量");
+  }
+
+  // 到期：优先提取日期
+  const mExpire = name.match(/到期\s*[:：]?\s*([0-9]{4}[-\/.][0-9]{1,2}[-\/.][0-9]{1,2})/);
+  if (mExpire) {
+    out.push(`到期${mExpire[1]}`);
+  } else if (/(?:到期|過期|过期|EXPIRE)/i.test(name)) {
+    out.push("到期");
+  }
+
+  return out;
 }
 
 function operator(pro) {
@@ -401,9 +428,9 @@ function operator(pro) {
     }
 
     const tags = []; // 累加特性：IPLC/家宽/BGP/中转/优化/下载...
-    let ikey = "";   // 最终倍率字段（例如 1.0倍率 / 2.0倍率 / 0.5倍率）
+    let ikey = ""; // 最终倍率字段（例如 1.0倍率 / 2.0倍率 / 0.5倍率）
 
-    // 需要显示倍率的开关：开启 bl 或 blgd 任意一个，就输出倍率（倍率来源由统一函数决定）
+    // 需要显示倍率：bl 或 blgd 任意开启
     const needRate = bl || blgd;
 
     // 1) blgd：累加特性（可多项叠加）
@@ -412,9 +439,12 @@ function operator(pro) {
         if (!regex.test(e.name)) return;
         tags.push(valueArray[index]);
       });
+
+      // 1.1) 额外保留：剩余流量 / 到期 / Emby（无需传 blkey）
+      tags.push(...collectExtraKeeps(e.name));
     }
 
-    // 2) 倍率：统一入口（优先普通倍率 > ˣ倍率 > 默认1.0）
+    // 2) 倍率：统一入口
     if (needRate) {
       ikey = getRateUnified(e.name);
     }
@@ -529,3 +559,33 @@ function fampx(pro) {
   wnout.sort((a, b) => pro.indexOf(a) - pro.indexOf(b));
   return wnout.concat(wis);
 }
+
+/**
+ * Sub-Store 入口兼容：
+ * - $resource 可能是 { proxies: [...] } 或直接是 [...]
+ * - 保留原对象其他字段
+ */
+(() => {
+  const data = typeof $resource !== "undefined" ? $resource : null;
+
+  if (!data) {
+    // 无输入，直接结束
+    $done({});
+    return;
+  }
+
+  // 兼容 data 为数组或对象
+  const isArr = Array.isArray(data);
+  const proxies = isArr ? data : Array.isArray(data.proxies) ? data.proxies : [];
+
+  const outProxies = operator(proxies);
+
+  if (isArr) {
+    $done(outProxies);
+  } else {
+    $done({
+      ...data,
+      proxies: outProxies,
+    });
+  }
+})();
