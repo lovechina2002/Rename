@@ -148,6 +148,8 @@ const regexArray = [
   /\bgpt\b/i,
   /udpn\b/i,
   /\bBT\b/i,
+  /\bISP\b/i,
+  /\bPremium\b/i,
 ];
 
 const valueArray = [
@@ -173,6 +175,8 @@ const valueArray = [
   "GPT",
   "UDPN",
   "BT",
+  "ISP",
+  "Premium",
 ];
 
 // 高倍/倍率过滤：支持普通倍率 + 任意 ˣ... 上标倍率（支持普通点 .）
